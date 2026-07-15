@@ -1,4 +1,4 @@
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
@@ -9,7 +9,7 @@ export default defineConfig({
     target: 'es2019',
     cssCodeSplit: false,
     rollupOptions: {
-      input: fileURLToPath(new URL('./app.html', import.meta.url)),
+      input: resolve(process.cwd(), 'app.html'),
       output: {
         entryFileNames: 'assets/app.js',
         chunkFileNames: 'assets/chunk-[name].js',
