@@ -6,9 +6,63 @@
     <meta name="theme-color" content="#071a2d" />
     <meta name="description" content="Invent, simulate, fold, and test physics-informed paper airplanes." />
     <title>Paper Airplane Lab</title>
+    <style>
+      #boot-status {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 32px;
+        color: #f7f4ed;
+        background: #071a2d;
+        font: 600 18px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        text-align: center;
+      }
+
+      #boot-status strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 28px;
+      }
+    </style>
+    <script>
+      ;(() => {
+        const showBootError = (message) => {
+          const status = document.getElementById('boot-status')
+          if (!status) return
+          status.innerHTML = `<div><strong>Paper Airplane Lab could not start.</strong><span>${message}</span></div>`
+        }
+
+        window.addEventListener(
+          'error',
+          (event) => {
+            const message = event.message || 'A required application file did not load. Refresh the page and try again.'
+            showBootError(message)
+          },
+          true,
+        )
+
+        window.addEventListener('unhandledrejection', (event) => {
+          const message = event.reason?.message || 'The application encountered an unexpected startup error.'
+          showBootError(message)
+        })
+
+        window.setTimeout(() => {
+          const status = document.getElementById('boot-status')
+          if (!status) return
+          status.innerHTML = '<div><strong>Paper Airplane Lab is still loading.</strong><span>Refresh this page once. If this message remains, the browser will now show the startup error instead of a blank screen.</span></div>'
+        }, 10000)
+      })()
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main id="boot-status" role="status" aria-live="polite">
+        <div>
+          <strong>Paper Airplane Lab is loading…</strong>
+          <span>Preparing the flight engineering workspace.</span>
+        </div>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
