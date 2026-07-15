@@ -6,6 +6,14 @@ export default defineConfig({
   plugins: [react()],
   build: {
     target: 'es2019',
+    cssCodeSplit: false,
+    rollupOptions: {
+      output: {
+        entryFileNames: 'assets/app.js',
+        chunkFileNames: 'assets/chunk-[name].js',
+        assetFileNames: 'assets/app[extname]',
+      },
+    },
   },
   test: {
     globals: true,
