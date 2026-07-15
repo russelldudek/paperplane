@@ -1,8 +1,8 @@
 {
   "build": "success",
-  "deploy": "cancelled",
-  "pageUrl": null,
-  "runUrl": "https://github.com/russelldudek/paperplane/actions/runs/29412849441",
-  "commit": "6125c225c7002151faa6bceb44b2e86503499be8",
-  "recordedAt": "2026-07-15T11:47:54.846Z"
+  "deploy": "failure",
+  "pageUrl": "https://russelldudek.github.io/paperplane/",
+  "runUrl": "https://github.com/russelldudek/paperplane/actions/runs/29412885194",
+  "commit": "c565f4f60923358b03e3de0ebde1850043e29a22",
+  "recordedAt": "2026-07-15T11:48:47.149Z"
 }
