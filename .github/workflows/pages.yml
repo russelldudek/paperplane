@@ -34,6 +34,11 @@ jobs:
       - name: Build production site
         run: npm run build
 
+      - name: Verify GitHub Pages asset paths
+        run: |
+          grep -Eq 'src="/paperplane/assets/[^"]+\.js"' dist/index.html
+          grep -Eq 'href="/paperplane/assets/[^"]+\.css"' dist/index.html
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6
 
@@ -54,6 +59,19 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+      - name: Verify live homepage bundle
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          html="$(curl --fail --silent --show-error --retry 8 --retry-delay 2 "$PAGE_URL")"
+          asset_path="$(printf '%s' "$html" | sed -n 's/.*src="\([^"]*assets[^"]*\.js\)".*/\1/p')"
+          case "$asset_path" in
+            /paperplane/assets/*) ;;
+            *) echo "Unexpected or missing script asset path: $asset_path" >&2; exit 1 ;;
+          esac
+          origin="$(printf '%s' "$PAGE_URL" | sed -E 's#(https?://[^/]+).*#\1#')"
+          curl --fail --silent --show-error --retry 8 --retry-delay 2 "$origin$asset_path" >/dev/null
 
   report:
     needs: [build, deploy]
