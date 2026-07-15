@@ -3,6 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <meta name="theme-color" content="#071a2d" />
     <meta name="description" content="Invent, simulate, fold, and test physics-informed paper airplanes." />
     <title>Paper Airplane Lab</title>
@@ -23,34 +26,140 @@
         margin-bottom: 8px;
         font-size: 28px;
       }
+
+      #boot-status small {
+        display: block;
+        max-width: 900px;
+        margin: 18px auto 0;
+        color: #b9c8d6;
+        font: 500 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        overflow-wrap: anywhere;
+      }
     </style>
     <script>
-      ;(() => {
-        const showBootError = (message) => {
-          const status = document.getElementById('boot-status')
+      ;(function () {
+        var reloadParameter = 'pal-reload='
+
+        function getStatus() {
+          return document.getElementById('boot-status')
+        }
+
+        function showStatus(title, message, diagnostic) {
+          var status = getStatus()
           if (!status) return
-          status.innerHTML = `<div><strong>Paper Airplane Lab could not start.</strong><span>${message}</span></div>`
+
+          while (status.firstChild) status.removeChild(status.firstChild)
+
+          var wrapper = document.createElement('div')
+          var heading = document.createElement('strong')
+          var copy = document.createElement('span')
+          heading.textContent = title
+          copy.textContent = message
+          wrapper.appendChild(heading)
+          wrapper.appendChild(copy)
+
+          if (diagnostic) {
+            var details = document.createElement('small')
+            details.textContent = diagnostic
+            wrapper.appendChild(details)
+          }
+
+          status.appendChild(wrapper)
+        }
+
+        function appIsReady() {
+          return document.documentElement.getAttribute('data-pal-ready') === 'true'
+        }
+
+        function scriptDiagnostic() {
+          var script = document.querySelector('script[type="module"][src]')
+          var scriptUrl = script && script.src
+
+          if (!scriptUrl) {
+            showStatus(
+              'Paper Airplane Lab could not start.',
+              'The application script tag is missing from this page.',
+              'URL: ' + window.location.href,
+            )
+            return
+          }
+
+          if (typeof XMLHttpRequest === 'undefined') {
+            showStatus(
+              'Paper Airplane Lab could not start.',
+              'This browser cannot verify the application file.',
+              'Script: ' + scriptUrl + ' | Browser: ' + navigator.userAgent,
+            )
+            return
+          }
+
+          var request = new XMLHttpRequest()
+          request.open('GET', scriptUrl + '?diagnostic=' + Date.now(), true)
+          request.onreadystatechange = function () {
+            if (request.readyState !== 4 || appIsReady()) return
+
+            if (request.status >= 200 && request.status < 300) {
+              showStatus(
+                'Paper Airplane Lab could not start.',
+                'The application file downloaded, but this browser did not execute it.',
+                'HTTP ' + request.status + ' | Script: ' + scriptUrl + ' | Browser: ' + navigator.userAgent,
+              )
+            } else {
+              showStatus(
+                'Paper Airplane Lab could not start.',
+                'The browser could not download the application file.',
+                'HTTP ' + request.status + ' | Script: ' + scriptUrl + ' | Browser: ' + navigator.userAgent,
+              )
+            }
+          }
+          request.onerror = function () {
+            if (appIsReady()) return
+            showStatus(
+              'Paper Airplane Lab could not start.',
+              'The application file request was blocked or interrupted.',
+              'Script: ' + scriptUrl + ' | Browser: ' + navigator.userAgent,
+            )
+          }
+          request.send()
         }
 
         window.addEventListener(
           'error',
-          (event) => {
-            const message = event.message || 'A required application file did not load. Refresh the page and try again.'
-            showBootError(message)
+          function (event) {
+            if (appIsReady()) return
+            var target = event.target
+            var source = target && target.src ? ' Source: ' + target.src : ''
+            var message = event.message || 'A required application file did not load.'
+            showStatus('Paper Airplane Lab could not start.', message, source + ' Browser: ' + navigator.userAgent)
           },
           true,
         )
 
-        window.addEventListener('unhandledrejection', (event) => {
-          const message = event.reason?.message || 'The application encountered an unexpected startup error.'
-          showBootError(message)
+        window.addEventListener('unhandledrejection', function (event) {
+          if (appIsReady()) return
+          var reason = event.reason
+          var message = reason && reason.message ? reason.message : 'The application encountered an unexpected startup error.'
+          showStatus('Paper Airplane Lab could not start.', message, 'Browser: ' + navigator.userAgent)
         })
 
-        window.setTimeout(() => {
-          const status = document.getElementById('boot-status')
-          if (!status) return
-          status.innerHTML = '<div><strong>Paper Airplane Lab is still loading.</strong><span>Refresh this page once. If this message remains, the browser will now show the startup error instead of a blank screen.</span></div>'
-        }, 10000)
+        window.setTimeout(function () {
+          if (appIsReady() || !getStatus()) return
+
+          if (window.location.search.indexOf(reloadParameter) === -1) {
+            var separator = window.location.search ? '&' : '?'
+            window.location.replace(
+              window.location.pathname + window.location.search + separator + reloadParameter + Date.now() + window.location.hash,
+            )
+            return
+          }
+
+          showStatus(
+            'Paper Airplane Lab is checking its application file.',
+            'The automatic cache refresh completed. Running a startup diagnostic now…',
+            'URL: ' + window.location.href,
+          )
+          scriptDiagnostic()
+        }, 8000)
       })()
     </script>
   </head>
@@ -60,6 +169,7 @@
         <div>
           <strong>Paper Airplane Lab is loading…</strong>
           <span>Preparing the flight engineering workspace.</span>
+          <small>Boot profile: stable-assets-v1</small>
         </div>
       </main>
     </div>
