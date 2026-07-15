@@ -3,10 +3,12 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - DEPLOYMENT_STATUS.json
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -43,6 +45,8 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -50,3 +54,50 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+  report:
+    needs: [build, deploy]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record deployment status
+        uses: actions/github-script@v8
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const path = 'DEPLOYMENT_STATUS.json'
+            const status = {
+              build: process.env.BUILD_RESULT,
+              deploy: process.env.DEPLOY_RESULT,
+              pageUrl: process.env.PAGE_URL || null,
+              runUrl: process.env.RUN_URL,
+              commit: context.sha,
+              recordedAt: new Date().toISOString(),
+            }
+
+            let sha
+            try {
+              const response = await github.rest.repos.getContent({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                path,
+                ref: 'main',
+              })
+              if (!Array.isArray(response.data)) sha = response.data.sha
+            } catch (error) {
+              if (error.status !== 404) throw error
+            }
+
+            await github.rest.repos.createOrUpdateFileContents({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              path,
+              branch: 'main',
+              message: 'chore: record deployment status [skip pages]',
+              content: Buffer.from(`${JSON.stringify(status, null, 2)}\n`).toString('base64'),
+              sha,
+            })
