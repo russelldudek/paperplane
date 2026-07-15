@@ -1,0 +1,8 @@
+import type { FlightPrediction } from '../../domain/aerodynamics/model'
+import type { AircraftGenome } from '../../domain/aircraft/genome'
+import type { FoldInstructionSet } from '../../domain/instructions/folds'
+import { FoldDiagram } from './FoldDiagram'
+interface PrintableLabProps { genome: AircraftGenome; prediction: FlightPrediction; instructions: FoldInstructionSet }
+export function PrintableLab({ genome, prediction, instructions }: PrintableLabProps) {
+  return <div className="print-package"><section className="print-cover"><span>Paper Airplane Lab · Build Package</span><h1>{genome.name}</h1><p>{genome.family.replaceAll('-', ' ')} · revision {genome.id}</p><div className="print-predictions"><strong>{prediction.distanceM.low}–{prediction.distanceM.high} m</strong><span>modeled distance</span><strong>{prediction.airtimeS.low}–{prediction.airtimeS.high} s</strong><span>modeled airtime</span></div></section><section className="print-materials"><h2>Materials & safety</h2><ul>{instructions.materials.map(item => <li key={item}>{item}</li>)}</ul>{instructions.safetyNotes.map(note => <p key={note}>{note}</p>)}</section>{instructions.steps.map(step => <section className="print-fold-step" key={step.id}><div><span>Step {step.number}</span><h2>{step.title}</h2><p>{step.instruction}</p><strong>Checkpoint</strong><p>{step.checkpoint}</p></div><FoldDiagram step={step} /></section>)}<section className="print-log"><h2>Flight log</h2><table><thead><tr><th>Throw</th><th>Distance</th><th>Airtime</th><th>Behavior</th><th>One change</th></tr></thead><tbody>{[1,2,3,4,5].map(index => <tr key={index}><td>{index}</td><td></td><td></td><td></td><td></td></tr>)}</tbody></table></section></div>
+}

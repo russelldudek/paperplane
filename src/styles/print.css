@@ -1,0 +1,14 @@
+.print-package { display: none; }
+@media print {
+  .sidebar, .topbar, .build-page > :not(.print-package) { display: none !important; }
+  .app-shell, .main-shell, .workspace, .build-page { display: block !important; padding: 0 !important; background: white !important; }
+  .print-package { display: block; color: #111; font-family: Arial, sans-serif; }
+  .print-cover, .print-materials, .print-fold-step, .print-log { min-height: 92vh; page-break-after: always; padding: 12mm; }
+  .print-cover { display: grid; align-content: center; }
+  .print-cover h1 { font-size: 54pt; margin: 8mm 0 2mm; }
+  .print-predictions { margin-top: 20mm; display: grid; grid-template-columns: auto 1fr; gap: 3mm 8mm; }
+  .print-fold-step { display: grid; grid-template-columns: 1fr 110mm; gap: 12mm; align-items: center; }
+  .fold-diagram { width: 100%; }
+  .print-log table { width: 100%; border-collapse: collapse; }
+  .print-log th, .print-log td { border: 1px solid #333; height: 18mm; padding: 3mm; }
+}
