@@ -34,8 +34,9 @@ jobs:
       - name: Build production site
         run: npm run build
 
-      - name: Verify GitHub Pages asset paths
+      - name: Verify GitHub Pages artifact
         run: |
+          grep -q 'id="boot-status"' dist/index.html
           grep -Eq 'src="/paperplane/assets/[^"]+\.js"' dist/index.html
           grep -Eq 'href="/paperplane/assets/[^"]+\.css"' dist/index.html
 
@@ -60,44 +61,75 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v5
 
-      - name: Verify live homepage bundle
+      - name: Wait for the deployed artifact to propagate
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
-          html="$(curl --fail --silent --show-error --retry 8 --retry-delay 2 "$PAGE_URL")"
-          asset_path="$(printf '%s' "$html" | sed -n 's/.*src="\([^"]*assets[^"]*\.js\)".*/\1/p')"
-          case "$asset_path" in
-            /paperplane/assets/*) ;;
-            *) echo "Unexpected or missing script asset path: $asset_path" >&2; exit 1 ;;
-          esac
+          asset_path=''
+          html=''
+
+          for attempt in {1..24}; do
+            html="$(curl \
+              --fail \
+              --silent \
+              --show-error \
+              --header 'Cache-Control: no-cache' \
+              "${PAGE_URL}?deploy=${GITHUB_SHA}&attempt=${attempt}" || true)"
+
+            asset_path="$(printf '%s' "$html" | grep -oE 'src="/paperplane/assets/[^"]+\.js"' | head -n 1 | cut -d '"' -f 2 || true)"
+
+            if printf '%s' "$html" | grep -q 'id="boot-status"' && [ -n "$asset_path" ]; then
+              break
+            fi
+
+            sleep 5
+          done
+
+          if [ -z "$asset_path" ]; then
+            echo 'GitHub Pages did not serve the newly deployed application HTML.' >&2
+            printf '%s\n' "$html" >&2
+            exit 1
+          fi
+
           origin="$(printf '%s' "$PAGE_URL" | sed -E 's#(https?://[^/]+).*#\1#')"
-          curl --fail --silent --show-error --retry 8 --retry-delay 2 "$origin$asset_path" >/dev/null
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --header 'Cache-Control: no-cache' \
+            "$origin$asset_path?deploy=${GITHUB_SHA}" \
+            >/dev/null
 
       - name: Verify live app renders in Chrome
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
-          for attempt in {1..8}; do
+          rendered='false'
+
+          for attempt in {1..12}; do
             timeout 30s google-chrome \
               --headless=new \
               --no-sandbox \
               --disable-gpu \
               --disable-dev-shm-usage \
               --virtual-time-budget=10000 \
-              --dump-dom "${PAGE_URL}?commit=${GITHUB_SHA}&attempt=${attempt}" \
+              --dump-dom "${PAGE_URL}?render=${GITHUB_SHA}&attempt=${attempt}" \
               > live-dom.html 2> chrome.log || true
 
             if grep -q 'Choose a mission' live-dom.html && grep -q 'Simulation engine ready' live-dom.html; then
-              exit 0
+              rendered='true'
+              break
             fi
 
             sleep 5
           done
 
-          echo 'The public page loaded, but the React application did not render.' >&2
-          cat live-dom.html >&2 || true
-          cat chrome.log >&2 || true
-          exit 1
+          if [ "$rendered" != 'true' ]; then
+            echo 'The latest public HTML was present, but the React application did not render.' >&2
+            cat live-dom.html >&2 || true
+            cat chrome.log >&2 || true
+            exit 1
+          fi
 
   report:
     needs: [build, deploy]
