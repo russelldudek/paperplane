@@ -47,7 +47,6 @@
         function showStatus(title, message, diagnostic) {
           var status = getStatus()
           if (!status) return
-
           while (status.firstChild) status.removeChild(status.firstChild)
 
           var wrapper = document.createElement('div')
@@ -76,20 +75,7 @@
           var scriptUrl = script && script.src
 
           if (!scriptUrl) {
-            showStatus(
-              'Paper Airplane Lab could not start.',
-              'The application script tag is missing from this page.',
-              'URL: ' + window.location.href,
-            )
-            return
-          }
-
-          if (typeof XMLHttpRequest === 'undefined') {
-            showStatus(
-              'Paper Airplane Lab could not start.',
-              'This browser cannot verify the application file.',
-              'Script: ' + scriptUrl + ' | Browser: ' + navigator.userAgent,
-            )
+            showStatus('Paper Airplane Lab could not start.', 'The compiled application script is missing.', 'URL: ' + window.location.href)
             return
           }
 
@@ -97,71 +83,46 @@
           request.open('GET', scriptUrl + '?diagnostic=' + Date.now(), true)
           request.onreadystatechange = function () {
             if (request.readyState !== 4 || appIsReady()) return
-
-            if (request.status >= 200 && request.status < 300) {
-              showStatus(
-                'Paper Airplane Lab could not start.',
-                'The application file downloaded, but this browser did not execute it.',
-                'HTTP ' + request.status + ' | Script: ' + scriptUrl + ' | Browser: ' + navigator.userAgent,
-              )
-            } else {
-              showStatus(
-                'Paper Airplane Lab could not start.',
-                'The browser could not download the application file.',
-                'HTTP ' + request.status + ' | Script: ' + scriptUrl + ' | Browser: ' + navigator.userAgent,
-              )
-            }
-          }
-          request.onerror = function () {
-            if (appIsReady()) return
+            var available = request.status >= 200 && request.status < 300
             showStatus(
               'Paper Airplane Lab could not start.',
-              'The application file request was blocked or interrupted.',
-              'Script: ' + scriptUrl + ' | Browser: ' + navigator.userAgent,
+              available ? 'The application file downloaded, but this browser did not execute it.' : 'The browser could not download the application file.',
+              'HTTP ' + request.status + ' | Script: ' + scriptUrl + ' | Browser: ' + navigator.userAgent,
             )
+          }
+          request.onerror = function () {
+            if (!appIsReady()) showStatus('Paper Airplane Lab could not start.', 'The application file request was blocked or interrupted.', 'Script: ' + scriptUrl)
           }
           request.send()
         }
 
-        window.addEventListener(
-          'error',
-          function (event) {
-            if (appIsReady()) return
-            var target = event.target
-            var source = target && target.src ? ' Source: ' + target.src : ''
-            var message = event.message || 'A required application file did not load.'
-            showStatus('Paper Airplane Lab could not start.', message, source + ' Browser: ' + navigator.userAgent)
-          },
-          true,
-        )
+        window.addEventListener('error', function (event) {
+          if (appIsReady()) return
+          var target = event.target
+          var source = target && target.src ? 'Source: ' + target.src : ''
+          showStatus('Paper Airplane Lab could not start.', event.message || 'A required application file did not load.', source + ' Browser: ' + navigator.userAgent)
+        }, true)
 
         window.addEventListener('unhandledrejection', function (event) {
           if (appIsReady()) return
           var reason = event.reason
-          var message = reason && reason.message ? reason.message : 'The application encountered an unexpected startup error.'
-          showStatus('Paper Airplane Lab could not start.', message, 'Browser: ' + navigator.userAgent)
+          showStatus('Paper Airplane Lab could not start.', reason && reason.message ? reason.message : 'The application encountered an unexpected startup error.', 'Browser: ' + navigator.userAgent)
         })
 
         window.setTimeout(function () {
           if (appIsReady() || !getStatus()) return
-
           if (window.location.search.indexOf(reloadParameter) === -1) {
             var separator = window.location.search ? '&' : '?'
-            window.location.replace(
-              window.location.pathname + window.location.search + separator + reloadParameter + Date.now() + window.location.hash,
-            )
+            window.location.replace(window.location.pathname + window.location.search + separator + reloadParameter + Date.now() + window.location.hash)
             return
           }
-
-          showStatus(
-            'Paper Airplane Lab is checking its application file.',
-            'The automatic cache refresh completed. Running a startup diagnostic now…',
-            'URL: ' + window.location.href,
-          )
+          showStatus('Paper Airplane Lab is checking its application file.', 'The automatic cache refresh completed. Running a startup diagnostic now…', 'URL: ' + window.location.href)
           scriptDiagnostic()
         }, 8000)
       })()
     </script>
+    <script type="module" crossorigin src="/paperplane/assets/app.js"></script>
+    <link rel="stylesheet" crossorigin href="/paperplane/assets/app.css">
   </head>
   <body>
     <div id="root">
@@ -169,10 +130,9 @@
         <div>
           <strong>Paper Airplane Lab is loading…</strong>
           <span>Preparing the flight engineering workspace.</span>
-          <small>Boot profile: stable-assets-v1</small>
+          <small>Boot profile: compiled-root-v1</small>
         </div>
       </main>
     </div>
-    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
