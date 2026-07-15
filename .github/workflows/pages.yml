@@ -73,6 +73,32 @@ jobs:
           origin="$(printf '%s' "$PAGE_URL" | sed -E 's#(https?://[^/]+).*#\1#')"
           curl --fail --silent --show-error --retry 8 --retry-delay 2 "$origin$asset_path" >/dev/null
 
+      - name: Verify live app renders in Chrome
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          for attempt in {1..8}; do
+            timeout 30s google-chrome \
+              --headless=new \
+              --no-sandbox \
+              --disable-gpu \
+              --disable-dev-shm-usage \
+              --virtual-time-budget=10000 \
+              --dump-dom "${PAGE_URL}?commit=${GITHUB_SHA}&attempt=${attempt}" \
+              > live-dom.html 2> chrome.log || true
+
+            if grep -q 'Choose a mission' live-dom.html && grep -q 'Simulation engine ready' live-dom.html; then
+              exit 0
+            fi
+
+            sleep 5
+          done
+
+          echo 'The public page loaded, but the React application did not render.' >&2
+          cat live-dom.html >&2 || true
+          cat chrome.log >&2 || true
+          exit 1
+
   report:
     needs: [build, deploy]
     if: always()
