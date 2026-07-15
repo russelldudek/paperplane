@@ -37,8 +37,11 @@ jobs:
       - name: Verify GitHub Pages artifact
         run: |
           grep -q 'id="boot-status"' dist/index.html
-          grep -Eq 'src="/paperplane/assets/[^"]+\.js"' dist/index.html
-          grep -Eq 'href="/paperplane/assets/[^"]+\.css"' dist/index.html
+          grep -q 'pal-reload=' dist/index.html
+          grep -q 'src="/paperplane/assets/app.js"' dist/index.html
+          grep -q 'href="/paperplane/assets/app.css"' dist/index.html
+          test -s dist/assets/app.js
+          test -s dist/assets/app.css
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6
@@ -65,7 +68,7 @@ jobs:
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
-          asset_path=''
+          propagated='false'
           html=''
 
           for attempt in {1..24}; do
@@ -76,17 +79,18 @@ jobs:
               --header 'Cache-Control: no-cache' \
               "${PAGE_URL}?deploy=${GITHUB_SHA}&attempt=${attempt}" || true)"
 
-            asset_path="$(printf '%s' "$html" | grep -oE 'src="/paperplane/assets/[^"]+\.js"' | head -n 1 | cut -d '"' -f 2 || true)"
-
-            if printf '%s' "$html" | grep -q 'id="boot-status"' && [ -n "$asset_path" ]; then
+            if printf '%s' "$html" | grep -q 'src="/paperplane/assets/app.js"' \
+              && printf '%s' "$html" | grep -q 'href="/paperplane/assets/app.css"' \
+              && printf '%s' "$html" | grep -q 'stable-assets-v1'; then
+              propagated='true'
               break
             fi
 
             sleep 5
           done
 
-          if [ -z "$asset_path" ]; then
-            echo 'GitHub Pages did not serve the newly deployed application HTML.' >&2
+          if [ "$propagated" != 'true' ]; then
+            echo 'GitHub Pages did not serve the newly deployed stable-asset HTML.' >&2
             printf '%s\n' "$html" >&2
             exit 1
           fi
@@ -97,7 +101,14 @@ jobs:
             --silent \
             --show-error \
             --header 'Cache-Control: no-cache' \
-            "$origin$asset_path?deploy=${GITHUB_SHA}" \
+            "$origin/paperplane/assets/app.js?deploy=${GITHUB_SHA}" \
+            >/dev/null
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --header 'Cache-Control: no-cache' \
+            "$origin/paperplane/assets/app.css?deploy=${GITHUB_SHA}" \
             >/dev/null
 
       - name: Verify live app renders in Chrome
@@ -116,7 +127,9 @@ jobs:
               --dump-dom "${PAGE_URL}?render=${GITHUB_SHA}&attempt=${attempt}" \
               > live-dom.html 2> chrome.log || true
 
-            if grep -q 'Choose a mission' live-dom.html && grep -q 'Simulation engine ready' live-dom.html; then
+            if grep -q 'data-pal-ready="true"' live-dom.html \
+              && grep -q 'Choose a mission' live-dom.html \
+              && grep -q 'Simulation engine ready' live-dom.html; then
               rendered='true'
               break
             fi
@@ -125,7 +138,7 @@ jobs:
           done
 
           if [ "$rendered" != 'true' ]; then
-            echo 'The latest public HTML was present, but the React application did not render.' >&2
+            echo 'The stable assets were public, but the React application did not render.' >&2
             cat live-dom.html >&2 || true
             cat chrome.log >&2 || true
             exit 1
