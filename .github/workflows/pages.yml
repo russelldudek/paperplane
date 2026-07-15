@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths-ignore:
       - DEPLOYMENT_STATUS.json
+      - index.html
+      - assets/**
+      - .nojekyll
   workflow_dispatch:
 
 permissions:
@@ -37,11 +40,31 @@ jobs:
       - name: Verify GitHub Pages artifact
         run: |
           grep -q 'id="boot-status"' dist/index.html
-          grep -q 'pal-reload=' dist/index.html
+          grep -q 'compiled-root-v1' dist/index.html
           grep -q 'src="/paperplane/assets/app.js"' dist/index.html
           grep -q 'href="/paperplane/assets/app.css"' dist/index.html
+          ! grep -q '/src/main.tsx' dist/index.html
           test -s dist/assets/app.js
           test -s dist/assets/app.css
+
+      - name: Publish compiled site to legacy Pages source
+        run: |
+          rm -rf assets
+          cp -R dist/assets assets
+          cp dist/index.html index.html
+          touch .nojekyll
+
+          grep -q 'src="/paperplane/assets/app.js"' index.html
+          ! grep -q '/src/main.tsx' index.html
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html assets .nojekyll
+
+          if ! git diff --cached --quiet; then
+            git commit -m 'chore: publish compiled Pages site [skip ci] [skip pages]'
+            git push origin HEAD:main
+          fi
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6
@@ -64,14 +87,14 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v5
 
-      - name: Wait for the deployed artifact to propagate
+      - name: Wait for compiled root to propagate
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
           propagated='false'
           html=''
 
-          for attempt in {1..24}; do
+          for attempt in {1..48}; do
             html="$(curl \
               --fail \
               --silent \
@@ -81,7 +104,8 @@ jobs:
 
             if printf '%s' "$html" | grep -q 'src="/paperplane/assets/app.js"' \
               && printf '%s' "$html" | grep -q 'href="/paperplane/assets/app.css"' \
-              && printf '%s' "$html" | grep -q 'stable-assets-v1'; then
+              && printf '%s' "$html" | grep -q 'compiled-root-v1' \
+              && ! printf '%s' "$html" | grep -q '/src/main.tsx'; then
               propagated='true'
               break
             fi
@@ -90,26 +114,14 @@ jobs:
           done
 
           if [ "$propagated" != 'true' ]; then
-            echo 'GitHub Pages did not serve the newly deployed stable-asset HTML.' >&2
+            echo 'GitHub Pages is still serving repository source instead of compiled output.' >&2
             printf '%s\n' "$html" >&2
             exit 1
           fi
 
           origin="$(printf '%s' "$PAGE_URL" | sed -E 's#(https?://[^/]+).*#\1#')"
-          curl \
-            --fail \
-            --silent \
-            --show-error \
-            --header 'Cache-Control: no-cache' \
-            "$origin/paperplane/assets/app.js?deploy=${GITHUB_SHA}" \
-            >/dev/null
-          curl \
-            --fail \
-            --silent \
-            --show-error \
-            --header 'Cache-Control: no-cache' \
-            "$origin/paperplane/assets/app.css?deploy=${GITHUB_SHA}" \
-            >/dev/null
+          curl --fail --silent --show-error --header 'Cache-Control: no-cache' "$origin/paperplane/assets/app.js?deploy=${GITHUB_SHA}" >/dev/null
+          curl --fail --silent --show-error --header 'Cache-Control: no-cache' "$origin/paperplane/assets/app.css?deploy=${GITHUB_SHA}" >/dev/null
 
       - name: Verify live app renders in Chrome
         env:
@@ -138,7 +150,7 @@ jobs:
           done
 
           if [ "$rendered" != 'true' ]; then
-            echo 'The stable assets were public, but the React application did not render.' >&2
+            echo 'The compiled root was public, but the React application did not render.' >&2
             cat live-dom.html >&2 || true
             cat chrome.log >&2 || true
             exit 1
